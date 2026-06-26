@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>개인 온습도계 v1.0</title>
+<title>개인 온습도계 v1.1</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
@@ -36,7 +36,7 @@
 </head>
 <body>
 <header>
-  <h1>개인 온습도계</h1><span class="ver">v1.0</span>
+  <h1>개인 온습도계</h1><span class="ver">v1.1</span>
   <span class="clock" id="clock">--:--:--</span>
 </header>
 <div class="wrap">
@@ -57,10 +57,10 @@
 
   <div class="chartbox">
     <h2>최근 24시간 추이</h2>
-    <canvas id="chart" height="220"></canvas>
+    <div style="position:relative;height:300px"><canvas id="chart"></canvas></div>
   </div>
 
-  <footer>개인용 · personal_env · v1.0</footer>
+  <footer>개인용 · personal_env · v1.1</footer>
 </div>
 
 <script>

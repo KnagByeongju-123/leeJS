@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>개인 온습도계 v1.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --line:#262d36; --ink:#e6edf3; --muted:#8b949e;
+    --temp:#f5b945; --humi:#3bc4f2; --feel:#e6edf3; --ok:#3fb950; --off:#6e7681; --warn:#f0883e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;}
+  header{padding:16px 16px 8px;display:flex;align-items:center;gap:10px}
+  header h1{font-size:18px;margin:0}
+  .ver{color:var(--muted);font-size:12px}
+  .clock{margin-left:auto;color:var(--muted);font-size:13px}
+  .wrap{padding:8px 16px 40px;max-width:560px;margin:0 auto}
+  .status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin:4px 2px 12px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--off)}
+  .cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 10px;text-align:center}
+  .card .lab{color:var(--muted);font-size:13px;margin-bottom:6px}
+  .card .num{font-size:30px;font-weight:700;line-height:1}
+  .card .unit{font-size:14px;color:var(--muted);font-weight:400}
+  .meta{display:flex;gap:10px;margin:14px 2px;color:var(--muted);font-size:13px;flex-wrap:wrap}
+  .meta b{color:var(--ink);font-weight:600}
+  .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:6px}
+  .chartbox h2{font-size:14px;margin:2px 4px 10px;color:var(--muted);font-weight:600}
+  .btn{background:#21262d;color:var(--ink);border:1px solid var(--line);border-radius:9px;
+    padding:8px 12px;font-size:13px;cursor:pointer}
+  footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
+</style>
+</head>
+<body>
+<header>
+  <h1>개인 온습도계</h1><span class="ver">v1.0</span>
+  <span class="clock" id="clock">--:--:--</span>
+</header>
+<div class="wrap">
+  <div class="status"><span class="dot" id="dot"></span><span id="stat">불러오는 중…</span>
+    <button class="btn" style="margin-left:auto" onclick="loadAll()">새로고침</button></div>
+
+  <div class="cards">
+    <div class="card"><div class="lab">온도</div><div class="num" style="color:var(--temp)" id="t">--<span class="unit">°C</span></div></div>
+    <div class="card"><div class="lab">습도</div><div class="num" style="color:var(--humi)" id="h">--<span class="unit">%</span></div></div>
+    <div class="card"><div class="lab">체감</div><div class="num" style="color:var(--feel)" id="f">--<span class="unit">°C</span></div></div>
+  </div>
+
+  <div class="meta">
+    <span>측정시각 <b id="when">-</b></span>
+    <span>24h 온도 <b id="trange">-</b></span>
+    <span>24h 습도 <b id="hrange">-</b></span>
+  </div>
+
+  <div class="chartbox">
+    <h2>최근 24시간 추이</h2>
+    <canvas id="chart" height="220"></canvas>
+  </div>
+
+  <footer>개인용 · personal_env · v1.0</footer>
+</div>
+
+<script>
+const SB="https://jgvikmakenpllwxwdugk.supabase.co/rest/v1/";
+const KEY="sb_publishable_sKp-6nz2PQ9LxQ5pF-nYkg_YwoEJN6S";
+let chart=null;
+
+async function sbGet(path){
+  const r=await fetch(SB+path,{headers:{apikey:KEY,Authorization:"Bearer "+KEY}});
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return r.json();
+}
+const num=v=>(v==null||isNaN(v))?"--":(+v).toFixed(1);
+function kstTime(s){return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s));}
+function kstFull(s){return new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s));}
+function rel(s){
+  const sec=Math.floor((Date.now()-new Date(s).getTime())/1000);
+  if(sec<60) return "방금 전";
+  if(sec<3600) return Math.floor(sec/60)+"분 전";
+  if(sec<86400) return Math.floor(sec/3600)+"시간 전";
+  return Math.floor(sec/86400)+"일 전";
+}
+
+async function loadAll(){
+  const dot=document.getElementById('dot'),stat=document.getElementById('stat');
+  try{
+    const since=new Date(Date.now()-24*3600*1000).toISOString();
+    const [last,rows]=await Promise.all([
+      sbGet('personal_env?select=*&order=created_at.desc&limit=1'),
+      sbGet('personal_env?select=temperature,humidity,feels_like,measured_at,created_at'
+        +'&created_at=gte.'+encodeURIComponent(since)+'&order=created_at.asc&limit=5000')
+    ]);
+
+    if(last.length){
+      const r=last[0];
+      document.getElementById('t').innerHTML=num(r.temperature)+'<span class="unit">°C</span>';
+      document.getElementById('h').innerHTML=num(r.humidity)+'<span class="unit">%</span>';
+      document.getElementById('f').innerHTML=num(r.feels_like)+'<span class="unit">°C</span>';
+      const ts=r.measured_at||r.created_at;
+      document.getElementById('when').textContent=kstFull(ts)+' ('+rel(ts)+')';
+      const online=(Date.now()-new Date(ts).getTime())<180000;
+      dot.style.background=online?'var(--ok)':'var(--off)';
+      stat.textContent=online?'정상 수신 중':'신호 없음 (3분 이상)';
+    }else{
+      stat.textContent='데이터 없음';dot.style.background='var(--off)';
+    }
+
+    if(rows.length){
+      const ts=rows.map(r=>r.temperature).filter(v=>v!=null);
+      const hs=rows.map(r=>r.humidity).filter(v=>v!=null);
+      if(ts.length) document.getElementById('trange').textContent=Math.min(...ts).toFixed(1)+' ~ '+Math.max(...ts).toFixed(1)+'°C';
+      if(hs.length) document.getElementById('hrange').textContent=Math.min(...hs).toFixed(1)+' ~ '+Math.max(...hs).toFixed(1)+'%';
+    }
+    drawChart(rows);
+  }catch(e){
+    stat.textContent='오류: '+e.message;dot.style.background='var(--warn)';
+  }
+}
+
+function drawChart(rows){
+  const labels=rows.map(r=>kstTime(r.measured_at||r.created_at));
+  const T=rows.map(r=>r.temperature), F=rows.map(r=>r.feels_like), H=rows.map(r=>r.humidity);
+  const data={labels,datasets:[
+    {label:'온도 °C',data:T,borderColor:'#f5b945',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.35,yAxisID:'y'},
+    {label:'체감 °C',data:F,borderColor:'#e6edf3',backgroundColor:'transparent',borderWidth:1.5,pointRadius:0,tension:.35,yAxisID:'y'},
+    {label:'습도 %',data:H,borderColor:'#3bc4f2',backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.35,yAxisID:'y1'}
+  ]};
+  const opts={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#8b949e',boxWidth:14,font:{size:11}}}},
+    scales:{
+      x:{ticks:{color:'#8b949e',maxTicksLimit:8,font:{size:10}},grid:{color:'#21262d'}},
+      y:{position:'left',ticks:{color:'#f5b945',font:{size:10}},grid:{color:'#21262d'},title:{display:true,text:'°C',color:'#8b949e'}},
+      y1:{position:'right',ticks:{color:'#3bc4f2',font:{size:10}},grid:{drawOnChartArea:false},title:{display:true,text:'%',color:'#8b949e'}}
+    }};
+  if(chart){chart.data=data;chart.options=opts;chart.update();}
+  else chart=new Chart(document.getElementById('chart'),{type:'line',data,options:opts});
+}
+
+setInterval(()=>{document.getElementById('clock').textContent=new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date());},1000);
+loadAll();
+setInterval(loadAll,60000);
+</script>
+</body>
+</html>

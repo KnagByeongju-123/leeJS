@@ -54,6 +54,16 @@ function readRecent_(n){
 }
 
 function doGet(e){
+  const p = (e && e.parameter) || {};
+  // 보정값 저장 (브라우저 CORS 회피 위해 GET 사용)
+  if (p.action === 'setcal') {
+    writeCal_(p.name || '', p.t, p.h);
+    return jsonp_(p.callback, { ok: true });
+  }
+  // 보정값 조회
+  if (p.action === 'cal') {
+    return jsonp_(p.callback, { ok: true, cal: readCal_() });
+  }
   if (e && e.parameter && e.parameter.action === 'data') {
     const n = parseInt(e.parameter.n, 10) || 3000;
     const out = JSON.stringify({ ok: true, rows: readRecent_(n) });
@@ -98,4 +108,58 @@ function removeCleanup(){
   ScriptApp.getProjectTriggers().forEach(function(t){
     if (t.getHandlerFunction() === 'cleanupOld') ScriptApp.deleteTrigger(t);
   });
+}
+
+
+/* ===== 보정(offset) 서버 저장 ===== */
+const CAL_SHEET = '보정';
+
+function calSheet_(){
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(CAL_SHEET);
+  if (!sh) sh = ss.insertSheet(CAL_SHEET);
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(['기기명', '온도보정', '습도보정']);
+    sh.setFrozenRows(1);
+    sh.getRange('A1:C1').setFontWeight('bold');
+  }
+  return sh;
+}
+
+function readCal_(){
+  const sh = calSheet_();
+  const last = sh.getLastRow();
+  const out = {};
+  if (last < 2) return out;
+  const v = sh.getRange(2, 1, last - 1, 3).getValues();
+  v.forEach(function(r){
+    if (r[0] === '' || r[0] == null) return;
+    out[String(r[0])] = { t: Number(r[1]) || 0, h: Number(r[2]) || 0 };
+  });
+  return out;
+}
+
+function writeCal_(name, t, h){
+  name = String(name || '').trim();
+  if (!name) return;
+  const tt = parseFloat(t) || 0, hh = parseFloat(h) || 0;
+  const sh = calSheet_();
+  const last = sh.getLastRow();
+  if (last >= 2) {
+    const names = sh.getRange(2, 1, last - 1, 1).getValues();
+    for (let i = 0; i < names.length; i++) {
+      if (String(names[i][0]) === name) {
+        sh.getRange(i + 2, 2, 1, 2).setValues([[tt, hh]]);
+        return;
+      }
+    }
+  }
+  sh.appendRow([name, tt, hh]);
+}
+
+function jsonp_(cb, obj){
+  const out = JSON.stringify(obj);
+  if (cb) return ContentService.createTextOutput(cb + '(' + out + ')')
+                  .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  return ContentService.createTextOutput(out).setMimeType(ContentService.MimeType.JSON);
 }

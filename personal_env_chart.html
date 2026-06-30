@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>온습도관리 v4.9</title>
+<title>온습도관리 v5.0</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{--bg:#0e1116;--panel:#161b22;--line:#262d36;--ink:#e6edf3;--muted:#8b949e;--temp:#f5b945;--humi:#3bc4f2;--feel:#e6edf3;--ok:#3fb950;--off:#6e7681}
@@ -66,7 +66,7 @@
 </style>
 </head>
 <body>
-<header><h1>온습도관리</h1><span class="ver">v4.9</span><span class="clock" id="clock">--:--</span></header>
+<header><h1>온습도관리</h1><span class="ver">v5.0</span><span class="clock" id="clock">--:--</span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -103,7 +103,7 @@
     </div>
   </div>
 
-  <footer>온습도관리 · 구글시트(다중 URL 통합) · v4.9</footer>
+  <footer>온습도관리 · 구글시트(다중 URL 통합) · v5.0</footer>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -318,7 +318,7 @@ function downloadCSV(all){
 
 loadUrls();renderUrls();
 if(URLS.length)load();
-setInterval(load,600000);
+setInterval(load,3600000); // 1시간마다 자동 갱신(저장주기와 동일)
 </script>
 </body>
 </html>

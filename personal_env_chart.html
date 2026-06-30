@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>온습도관리 v4.8</title>
+<title>온습도관리 v4.9</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{--bg:#0e1116;--panel:#161b22;--line:#262d36;--ink:#e6edf3;--muted:#8b949e;--temp:#f5b945;--humi:#3bc4f2;--feel:#e6edf3;--ok:#3fb950;--off:#6e7681}
@@ -26,6 +26,7 @@
   .card .nm{display:flex;flex-direction:column;gap:2px;flex:0 0 auto;min-width:96px;font-size:14px;font-weight:600}
   .card .nm .nr{display:flex;align-items:center;gap:6px}
   .card .nm .t{color:var(--muted);font-size:11px;font-weight:400}
+  .card .nm .cal{display:inline-block;font-size:10px;font-weight:600;color:#04130a;background:var(--ok);padding:1px 6px;border-radius:8px;margin-top:2px;width:fit-content}
   .sdot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
   .card .vals{display:flex;flex:1;justify-content:space-around;text-align:center;gap:10px}
   .card .v{min-width:0}
@@ -65,7 +66,7 @@
 </style>
 </head>
 <body>
-<header><h1>온습도관리</h1><span class="ver">v4.8</span><span class="clock" id="clock">--:--</span></header>
+<header><h1>온습도관리</h1><span class="ver">v4.9</span><span class="clock" id="clock">--:--</span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -102,7 +103,7 @@
     </div>
   </div>
 
-  <footer>온습도관리 · 구글시트(다중 URL 통합) · v4.8</footer>
+  <footer>온습도관리 · 구글시트(다중 URL 통합) · v4.9</footer>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -257,9 +258,12 @@ function renderCards(){
   if(!NAMES.length){box.innerHTML='<div class="empty">데이터가 없습니다. (URL 등록 후 보드가 전송하면 자동 표시)</div>';return;}
   box.innerHTML=NAMES.map(n=>{
     const rows=BY[n];const l0=latest(rows);const on=online(rows);const l=l0?corr(n,l0):null;
+    const o=getCal(n);
+    const fmt=(x)=>(x>0?'+':'')+x;
+    const cal=(o.t||o.h)?('<span class="cal">보정 '+(o.t?('온도'+fmt(o.t)):'')+(o.t&&o.h?' / ':'')+(o.h?('습도'+fmt(o.h)):'')+'</span>'):'';
     const v=(x,u)=>(l&&l[x]!=null)?(l[x]+'<span class="u">'+u+'</span>'):'--';
     return `<div class="card">
-      <div class="nm"><span class="nr"><span class="sdot" style="background:${on?'var(--ok)':'var(--off)'}"></span>${n}</span><span class="t">${l?String(l.ts).slice(5,16):'-'}</span></div>
+      <div class="nm"><span class="nr"><span class="sdot" style="background:${on?'var(--ok)':'var(--off)'}"></span>${n}</span><span class="t">${l?String(l.ts).slice(5,16):'-'}</span>${cal}</div>
       <div class="vals">
         <div class="v"><div class="lab">온도</div><div class="n" style="color:var(--temp)">${v('t','℃')}</div></div>
         <div class="v"><div class="lab">습도</div><div class="n" style="color:var(--humi)">${v('h','%')}</div></div>
